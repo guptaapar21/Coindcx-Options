@@ -1,3 +1,4 @@
+import json
 import tempfile
 from pathlib import Path
 
@@ -21,7 +22,7 @@ def test_build_snapshot_derives_mid_and_spread():
     }]
     with tempfile.TemporaryDirectory() as d:
         p = Path(d) / "normalized.jsonl"
-        p.write_text("\n".join(__import__("json").dumps(x) for x in rows) + "\n", encoding="utf-8")
+        p.write_text("\n".join(json.dumps(x) for x in rows) + "\n", encoding="utf-8")
         loaded = load_normalized(p)
     built = build_snapshots(loaded)
     assert built[0]["mid"] == 101
@@ -43,4 +44,4 @@ def test_forward_return_is_computed():
             "mid": mid,
         })
     out = attach_forward_returns(rows)
-    assert out[0]["return_1m_pct"] == 5.0
+    assert abs(out[0]["return_1m_pct"] - 5.0) < 1e-12
