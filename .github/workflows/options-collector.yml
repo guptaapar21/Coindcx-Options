@@ -33,8 +33,11 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r requirements.txt pytest
           python -m playwright install --with-deps chromium
+
+      - name: Unit tests
+        run: python -m pytest -q
 
       - name: Validate inputs
         env:
@@ -60,10 +63,24 @@ jobs:
       - name: Validate capture structure
         run: python tools/validate_options_capture.py data/raw
 
+      - name: Build research table
+        run: |
+          NORMALIZED=$(find data/raw -name normalized_events.jsonl -type f | sort | tail -n 1)
+          test -n "$NORMALIZED"
+          python -m src.options_research "$NORMALIZED" --output data/options_research.csv
+
       - name: Upload raw options capture
         uses: actions/upload-artifact@v4
         with:
           name: coindcx-options-${{ github.run_id }}
           path: data/raw/
           retention-days: 7
+          if-no-files-found: error
+
+      - name: Upload research table
+        uses: actions/upload-artifact@v4
+        with:
+          name: coindcx-options-research-${{ github.run_id }}
+          path: data/options_research.csv
+          retention-days: 30
           if-no-files-found: error
