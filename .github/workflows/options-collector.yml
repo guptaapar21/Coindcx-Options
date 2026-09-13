@@ -1,12 +1,14 @@
 name: Options Collector
 
 on:
+  schedule:
+    - cron: "*/5 * * * *"
   workflow_dispatch:
     inputs:
       duration_minutes:
         description: Collection duration in minutes
         required: true
-        default: "120"
+        default: "5"
         type: string
       underlyings:
         description: Space-separated CoinDCX option underlyings
@@ -14,13 +16,17 @@ on:
         default: "BTC ETH SOL XAUT"
         type: string
 
+concurrency:
+  group: coindcx-options-collector
+  cancel-in-progress: false
+
 permissions:
   contents: read
 
 jobs:
   collect:
     runs-on: ubuntu-latest
-    timeout-minutes: 240
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -39,9 +45,24 @@ jobs:
       - name: Unit tests
         run: python -m pytest -q
 
+      - name: Resolve inputs
+        id: inputs
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_DURATION: ${{ inputs.duration_minutes }}
+          INPUT_UNDERLYINGS: ${{ inputs.underlyings }}
+        run: |
+          if [ "$EVENT_NAME" = "schedule" ]; then
+            echo "duration=5" >> "$GITHUB_OUTPUT"
+            echo "underlyings=BTC ETH SOL XAUT" >> "$GITHUB_OUTPUT"
+          else
+            echo "duration=${INPUT_DURATION:-5}" >> "$GITHUB_OUTPUT"
+            echo "underlyings=${INPUT_UNDERLYINGS:-BTC ETH SOL XAUT}" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Validate inputs
         env:
-          DURATION: ${{ inputs.duration_minutes }}
+          DURATION: ${{ steps.inputs.outputs.duration }}
         run: |
           python - <<'PY'
           import os
@@ -52,8 +73,8 @@ jobs:
 
       - name: Capture public options market data
         env:
-          DURATION: ${{ inputs.duration_minutes }}
-          UNDERLYINGS: ${{ inputs.underlyings }}
+          DURATION: ${{ steps.inputs.outputs.duration }}
+          UNDERLYINGS: ${{ steps.inputs.outputs.underlyings }}
         run: |
           python -m src.options_collector \
             --duration-minutes "$DURATION" \
@@ -66,8 +87,11 @@ jobs:
       - name: Build research table
         run: |
           NORMALIZED=$(find data/raw -name normalized_events.jsonl -type f | sort | tail -n 1)
-          test -n "$NORMALIZED"
-          python -m src.options_research "$NORMALIZED" --output data/options_research.csv
+          if [ -f "$NORMALIZED" ] && [ -s "$NORMALIZED" ]; then
+            python -m src.options_research "$NORMALIZED" --output data/options_research.csv
+          else
+            printf 'status,message\nNO_NORMALIZED_RECORDS,Raw network capture preserved\n' > data/options_research.csv
+          fi
 
       - name: Upload raw options capture
         uses: actions/upload-artifact@v4
