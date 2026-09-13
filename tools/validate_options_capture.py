@@ -23,14 +23,11 @@ def main() -> int:
     if metadata.get("secrets_written") is not False:
         raise SystemExit("Capture metadata does not certify secrets_written=false")
     stats = summary.get("stats", {})
-    # Native WebSocket traffic is optional: some public web sessions use XHR,
-    # fetch, SSE, long-polling or framework data transports instead.
-    websocket_file = run / "websocket_frames.jsonl"
-    if not nonempty(websocket_file) and not stats.get("http_json", 0) and not any(k in summary.get("stats", {}) for k in ("normalized",)):
+    if int(stats.get("http_json", 0) or 0) <= 0 and not nonempty(run / "websocket_frames.jsonl"):
         raise SystemExit("No usable market-data transport captured")
     if int(stats.get("normalized", 0) or 0) <= 0:
         raise SystemExit("No normalized option events captured")
-    print(json.dumps({"run": run.name, "underlyings": metadata.get("underlyings"), "stats": stats, "websocket_capture": nonempty(websocket_file)}, indent=2))
+    print(json.dumps({"run": run.name, "underlyings": metadata.get("underlyings"), "stats": stats, "websocket_capture": nonempty(run / "websocket_frames.jsonl")}, indent=2))
     return 0
 
 if __name__ == "__main__":
