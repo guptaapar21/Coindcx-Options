@@ -1,9 +1,10 @@
 {
   "collector": {
-    "default_duration_minutes": 120,
+    "default_duration_minutes": 5,
+    "bootstrap_cadence_minutes": 5,
     "max_duration_minutes": 230,
     "page_timeout_ms": 120000,
-    "idle_wait_ms": 1500,
+    "idle_wait_ms": 1000,
     "underlyings": ["BTC", "ETH", "SOL", "XAUT"],
     "url_template": "https://coindcx.com/options/{underlying_lower}",
     "headless": true,
