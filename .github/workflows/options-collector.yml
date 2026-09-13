@@ -50,6 +50,10 @@ jobs:
       - name: Unit tests
         run: python -m pytest -q
 
+      - name: Syntax preflight
+        run: |
+          python -m py_compile src/options_collector.py src/options_research.py tools/validate_options_capture.py
+
       - name: Resolve and validate inputs
         id: inputs
         env:
@@ -102,6 +106,7 @@ jobs:
           done
 
       - name: Build capture manifest
+        if: always()
         run: |
           python - <<'PY'
           import json
@@ -121,14 +126,16 @@ jobs:
           PY
 
       - name: Upload raw options capture
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: coindcx-options-bootstrap-${{ github.run_id }}
           path: data/raw/
           retention-days: 7
-          if-no-files-found: error
+          if-no-files-found: warn
 
       - name: Upload research tables
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: coindcx-options-research-${{ github.run_id }}
