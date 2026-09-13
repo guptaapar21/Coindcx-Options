@@ -32,7 +32,7 @@ def write_rows(path: Path, rows: list[dict[str, Any]]) -> None:
 def trim(text: str, limit: int) -> tuple[str, bool, str]:
     raw = text.encode("utf-8", errors="replace"); digest = hashlib.sha256(raw).hexdigest()
     if len(raw) <= limit: return text, False, digest
-    return raw[:limit].decode("utf-8", errors="ignore") + f"\n...[truncated sha256={digest}]", True, digest)
+    return raw[:limit].decode("utf-8", errors="ignore") + f"\n...[truncated sha256={digest}]", True, digest
 def first(mapping: dict[str, Any], keys: tuple[str, ...]) -> Any:
     low = {str(k).lower(): v for k, v in mapping.items()}
     for key in keys:
@@ -177,7 +177,7 @@ def main() -> int:
     with sync_playwright() as pw:
         browser: Browser = pw.chromium.launch(headless=not a.headed); context = browser.new_context(locale="en-IN", timezone_id="UTC", viewport={"width": 1440, "height": 1000}); pages: list[tuple[Page, str]] = []
         for name in names:
-            page = context.new_page(); attach(page, name, run_dir, 2_000_000, stats); url = f"https://coindcx.com/options/{name.lower()}"
+            page = context.new_page(); attach(page, name, run_dir, 2_000_000, stats, stop); url = f"https://coindcx.com/options/{name.lower()}"
             try: page.goto(url, wait_until="domcontentloaded", timeout=120_000)
             except Exception as exc: stats["errors"] += 1; write_rows(run_dir / "network_events.jsonl", [err("goto", name, exc, url=url)])
             page.wait_for_timeout(8_000); capture_page_state(page, name, run_dir, stats); pages.append((page, name))
