@@ -1,8 +1,6 @@
 name: Options Collector
 
 on:
-  schedule:
-    - cron: "*/5 * * * *"
   workflow_dispatch:
     inputs:
       duration_minutes:
@@ -15,13 +13,20 @@ on:
         required: true
         default: "BTC ETH SOL XAUT"
         type: string
+      chain_runs:
+        description: Number of consecutive 5-minute runs in this self-triggered chain
+        required: true
+        default: "12"
+        type: string
 
+# No scheduled/cron trigger. One manual run can hand off to the next run.
 concurrency:
   group: coindcx-options-collector
   cancel-in-progress: false
 
 permissions:
   contents: read
+  actions: write
 
 jobs:
   collect:
@@ -45,31 +50,28 @@ jobs:
       - name: Unit tests
         run: python -m pytest -q
 
-      - name: Resolve inputs
+      - name: Resolve and validate chain inputs
         id: inputs
         env:
-          EVENT_NAME: ${{ github.event_name }}
-          INPUT_DURATION: ${{ inputs.duration_minutes }}
-          INPUT_UNDERLYINGS: ${{ inputs.underlyings }}
+          DURATION: ${{ inputs.duration_minutes }}
+          UNDERLYINGS: ${{ inputs.underlyings }}
+          CHAIN_RUNS: ${{ inputs.chain_runs }}
         run: |
-          if [ "$EVENT_NAME" = "schedule" ]; then
-            echo "duration=5" >> "$GITHUB_OUTPUT"
-            echo "underlyings=BTC ETH SOL XAUT" >> "$GITHUB_OUTPUT"
-          else
-            echo "duration=${INPUT_DURATION:-5}" >> "$GITHUB_OUTPUT"
-            echo "underlyings=${INPUT_UNDERLYINGS:-BTC ETH SOL XAUT}" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Validate inputs
-        env:
-          DURATION: ${{ steps.inputs.outputs.duration }}
-        run: |
+          duration="${DURATION:-5}"
+          underlyings="${UNDERLYINGS:-BTC ETH SOL XAUT}"
+          chain_runs="${CHAIN_RUNS:-12}"
           python - <<'PY'
           import os
-          value = int(os.environ['DURATION'])
-          if not 1 <= value <= 230:
+          duration = int(os.environ['DURATION'] or 5)
+          chain_runs = int(os.environ['CHAIN_RUNS'] or 12)
+          if not 1 <= duration <= 230:
               raise SystemExit('duration_minutes must be between 1 and 230')
+          if not 1 <= chain_runs <= 288:
+              raise SystemExit('chain_runs must be between 1 and 288')
           PY
+          echo "duration=$duration" >> "$GITHUB_OUTPUT"
+          echo "underlyings=$underlyings" >> "$GITHUB_OUTPUT"
+          echo "chain_runs=$chain_runs" >> "$GITHUB_OUTPUT"
 
       - name: Capture public options market data
         env:
@@ -108,3 +110,19 @@ jobs:
           path: data/options_research.csv
           retention-days: 30
           if-no-files-found: error
+
+      - name: Self-trigger next 5-minute run
+        if: ${{ !cancelled() && fromJSON(steps.inputs.outputs.chain_runs) > 1 }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NEXT_RUNS: ${{ fromJSON(steps.inputs.outputs.chain_runs) - 1 }}
+          NEXT_DURATION: ${{ steps.inputs.outputs.duration }}
+          NEXT_UNDERLYINGS: ${{ steps.inputs.outputs.underlyings }}
+        run: |
+          gh workflow run options-collector.yml \
+            --repo "${{ github.repository }}" \
+            --ref main \
+            -f duration_minutes="$NEXT_DURATION" \
+            -f underlyings="$NEXT_UNDERLYINGS" \
+            -f chain_runs="$NEXT_RUNS"
+          echo "Next self-triggered capture queued; remaining chain runs: $NEXT_RUNS"
