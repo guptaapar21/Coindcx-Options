@@ -1,0 +1,26 @@
+{
+  "collector": {
+    "default_duration_minutes": 120,
+    "max_duration_minutes": 230,
+    "page_timeout_ms": 120000,
+    "idle_wait_ms": 1500,
+    "underlyings": ["BTC", "ETH", "SOL", "XAUT"],
+    "url_template": "https://coindcx.com/options/{underlying_lower}",
+    "headless": true,
+    "browser": "chromium"
+  },
+  "capture": {
+    "save_html": true,
+    "save_screenshot": false,
+    "capture_http_json": true,
+    "capture_websocket_frames": true,
+    "capture_request_bodies": false,
+    "max_event_bytes": 2000000
+  },
+  "research": {
+    "timezone": "UTC",
+    "raw_is_source_of_truth": true,
+    "missing_fields": "null",
+    "live_trading": false
+  }
+}
