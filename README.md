@@ -23,7 +23,8 @@ Every run creates an immutable raw handoff containing:
 - page URL and timestamps
 - browser/network request metadata
 - JSON/JSON-like HTTP responses whose URL or payload appears options-related
-- WebSocket connection metadata and received frames
+- WebSocket connection metadata and received frames when present
+- embedded/framework page state and browser performance-resource diagnostics
 - a normalized event stream where contract/quote/trade-like fields can be identified
 - the raw page HTML snapshot at the end of the run
 
@@ -44,12 +45,22 @@ python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 python -m playwright install chromium
-python -m src.options_collector --underlyings BTC ETH SOL XAUT --duration-minutes 120 --out-dir data/raw
+python -m src.options_collector --underlyings BTC ETH SOL XAUT --duration-minutes 5 --out-dir data/raw
 ```
 
-## GitHub Actions
+## GitHub Actions and the CoinDCX block
 
-`options-collector.yml` is manually triggered with a default duration of **120 minutes**. The workflow archives the run as an artifact. It does not place orders and does not require exchange API credentials for public market-data collection.
+GitHub-hosted runners are **not** used for the capture job. A real capture from the hosted runner received HTTP **403** from CoinDCX/Cloudflare and the saved page was the Cloudflare block page, so retrying different GitHub-hosted regions does not solve the underlying problem.
+
+The Options Collector workflow therefore requires a self-hosted Linux x64 runner with these labels:
+
+`self-hosted`, `linux`, `x64`, `options-capture`
+
+The self-hosted machine must be on a network/IP from which `https://coindcx.com/options/btc` is reachable in a normal browser. The workflow performs a network preflight before starting the capture loop.
+
+Setup details are documented in [`docs/SELF_HOSTED_OPTIONS_CAPTURE.md`](docs/SELF_HOSTED_OPTIONS_CAPTURE.md).
+
+The workflow remains manually triggered and owns a bounded sequence of consecutive 5-minute segments. It archives raw capture and research outputs as GitHub Actions artifacts. It does not place orders and does not require exchange API credentials for public market-data collection.
 
 ## Safety / research boundary
 
